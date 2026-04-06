@@ -1,5 +1,7 @@
 # VQL-Velociraptor
 
+<img width="417" height="237" alt="image" src="https://github.com/user-attachments/assets/84db2bbf-00f7-4e74-b7a6-83feb84afbfe" />
+
 A curated repository of **Velociraptor Query Language (VQL)** content dedicated to **threat hunting, DFIR, detection engineering, and forensic investigations**.
 
 ## Overview
