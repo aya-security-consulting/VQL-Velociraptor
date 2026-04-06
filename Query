@@ -1,0 +1,228 @@
+1. Recently Executed EXE/DLL in Temp Paths
+LET TempPaths <= SELECT * FROM foreach(
+  row=[
+    dict(Path="C:/Windows/Temp/**"),
+    dict(Path="C:/Users/*/AppData/Local/Temp/**")
+  ],
+  query={
+    SELECT
+      OSPath,
+      Name,
+      Size,
+      Mtime,
+      Btime
+    FROM glob(globs=Path)
+    WHERE Name =~ "(?i)\\.(exe|dll|bat|cmd|ps1|vbs|js)$"
+  }
+)
+SELECT * FROM TempPaths
+ORDER BY Mtime DESC
+
+2. Suspicious Files Created in Public Folder
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime,
+  Btime
+FROM glob(globs="C:/Users/Public/**")
+WHERE Name =~ "(?i)\\.(exe|dll|bat|cmd|ps1|vbs|js|hta|scr)$"
+ORDER BY Mtime DESC
+
+3. PowerShell History Collection
+SELECT
+  OSPath,
+  Mtime,
+  Size
+FROM glob(globs="C:/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt")
+
+4. Search Suspicious Keywords in PowerShell History
+SELECT
+  OSPath,
+  LineNumber,
+  Line
+FROM grep(
+  filename="C:/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
+  keywords=[
+    "Invoke-WebRequest",
+    "IEX",
+    "DownloadString",
+    "FromBase64String",
+    "EncodedCommand",
+    "Net.WebClient",
+    "Start-BitsTransfer"
+  ]
+)
+
+5. Scheduled Tasks Enumeration
+SELECT
+  TaskName,
+  Author,
+  Command,
+  Arguments,
+  Enabled
+FROM Artifact.Windows.System.TaskScheduler()
+
+6. Suspicious Scheduled Tasks by Command Line
+SELECT
+  TaskName,
+  Author,
+  Command,
+  Arguments
+FROM Artifact.Windows.System.TaskScheduler()
+WHERE
+  Command =~ "(?i)(powershell|cmd|wscript|cscript|mshta|rundll32|regsvr32)"
+  OR Arguments =~ "(?i)(http|https|base64|encodedcommand|downloadstring)"
+
+7. Run / RunOnce Registry Persistence
+SELECT
+  Key,
+  Name,
+  Data,
+  Mtime
+FROM Artifact.Windows.Registry.RunKeys()
+
+8. Services With Suspicious Image Paths
+SELECT
+  Name,
+  DisplayName,
+  ImagePath,
+  StartType
+FROM Artifact.Windows.System.Services()
+WHERE ImagePath =~ "(?i)(temp|appdata|public|programdata)"
+
+9. Unsigned Autoruns Locations Hunt
+SELECT
+  FullPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs=[
+  "C:/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup/**",
+  "C:/Users/*/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/**"
+])
+WHERE Name =~ "(?i)\\.(exe|lnk|bat|cmd|vbs|js|ps1)$"
+ORDER BY Mtime DESC
+
+10. Recent Prefetch Files
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs="C:/Windows/Prefetch/*.pf")
+ORDER BY Mtime DESC
+LIMIT 200
+
+11. Look for LOLBins in Prefetch
+SELECT
+  Name,
+  Mtime
+FROM glob(globs="C:/Windows/Prefetch/*.pf")
+WHERE Name =~ "(?i)(POWERSHELL|CMD|RUNDLL32|REGSVR32|MSHTA|WMIC|BITSADMIN|CERTUTIL|CSCRIPT|WSCRIPT)"
+ORDER BY Mtime DESC
+
+12. Find Recently Modified Webshell-Like Files
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs=[
+  "C:/inetpub/wwwroot/**",
+  "D:/inetpub/wwwroot/**",
+  "C:/xampp/htdocs/**",
+  "C:/Apache*/htdocs/**"
+])
+WHERE Name =~ "(?i)\\.(php|aspx|jsp|asp)$"
+ORDER BY Mtime DESC
+
+13. Search Webshell Keywords in Web Root
+SELECT
+  OSPath,
+  LineNumber,
+  Line
+FROM grep(
+  filename=[
+    "C:/inetpub/wwwroot/**",
+    "D:/inetpub/wwwroot/**",
+    "C:/xampp/htdocs/**"
+  ],
+  keywords=[
+    "eval(",
+    "base64_decode",
+    "cmd.exe",
+    "powershell",
+    "shell_exec",
+    "assert(",
+    "System.Diagnostics.Process"
+  ]
+)
+
+14. Suspicious Downloads in User Download Folders
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs="C:/Users/*/Downloads/**")
+WHERE Name =~ "(?i)\\.(exe|iso|img|zip|rar|7z|js|hta|lnk|ps1)$"
+ORDER BY Mtime DESC
+
+15. Recently Added Local Users
+SELECT
+  Name,
+  RID,
+  SID,
+  Description,
+  Disabled
+FROM Artifact.Windows.Sys.Users()
+
+16. Administrators Group Membership
+SELECT
+  GroupName,
+  MemberName,
+  SID
+FROM Artifact.Windows.Sys.LocalGroups()
+WHERE GroupName =~ "(?i)administrators"
+
+17. RDP Related Event Hunt
+SELECT *
+FROM Artifact.Windows.EventLogs.EvtxHunter(
+  EvtxGlob="C:/Windows/System32/winevt/Logs/Security.evtx",
+  IocRegex=["4624", "4778", "4779"]
+)
+
+18. Search for Certificate Enrollment Activity
+SELECT *
+FROM Artifact.Windows.EventLogs.EvtxHunter(
+  EvtxGlob="C:/Windows/System32/winevt/Logs/Microsoft-Windows-CertificateServicesClient-Lifecycle-System%4Operational.evtx",
+  IocRegex=["enroll", "certificate", "template"]
+)
+
+19. Browser Login Databases Presence
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs=[
+  "C:/Users/*/AppData/Local/Google/Chrome/User Data/*/Login Data",
+  "C:/Users/*/AppData/Local/Microsoft/Edge/User Data/*/Login Data",
+  "C:/Users/*/AppData/Local/BraveSoftware/Brave-Browser/User Data/*/Login Data"
+])
+ORDER BY Mtime DESC
+
+20. Search Encoded / Obfuscated Scripts
+SELECT
+  OSPath,
+  Name,
+  Size,
+  Mtime
+FROM glob(globs=[
+  "C:/Users/*/Desktop/**",
+  "C:/Users/*/Downloads/**",
+  "C:/Users/*/AppData/Local/Temp/**"
+])
+WHERE Name =~ "(?i)\\.(ps1|vbs|js|hta|cmd|bat)$"
+ORDER BY Mtime DESC
